@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Catch the AR Character</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.166.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.166.1/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="phone-shell" aria-live="polite">
+      <section class="screen intro-screen is-active" data-screen="intro">
+        <div class="ambient-grid"></div>
+        <div class="brand-lockup">
+          <span class="brand-kicker">Ghostival POC</span>
+          <h1>Catch the Ghost</h1>
+        </div>
+
+        <div class="character-stage" aria-label="Character preview">
+          <div class="preview-viewport" id="previewViewport"></div>
+          <div class="collector-card">
+            <span id="previewName">Banas</span>
+          </div>
+        </div>
+
+        <div class="qr-panel">
+          <span>QR character id</span>
+          <select id="characterSelect" aria-label="Choose test character">
+            <option value="mr-ghost">mr ghost</option>
+          </select>
+        </div>
+
+        <div class="intro-actions">
+          <button class="primary-action" id="arButton" type="button">Enter AR</button>
+          <button class="secondary-action" id="startButton" type="button">Drag Preview</button>
+        </div>
+      </section>
+
+      <section class="screen game-screen" data-screen="game">
+        <video id="cameraFeed" autoplay muted playsinline></video>
+        <div class="camera-fallback" id="cameraFallback"></div>
+        <canvas id="gameCanvas" width="720" height="1280"></canvas>
+
+        <div class="top-hud">
+          <div>
+            <span class="eyebrow">Follow the ghost</span>
+            <strong id="gameTitle">Keep Banas inside</strong>
+          </div>
+          <button class="icon-button" id="exitButton" type="button" aria-label="Exit game">x</button>
+        </div>
+
+        <div class="capture-reticle" id="captureReticle" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+
+        <div class="status-pill is-capturing" id="statusPill">
+          <span class="status-dot"></span>
+          <strong id="statusText">Move your phone to keep the ghost inside!</strong>
+        </div>
+
+        <div class="timer-card">
+          <div class="timer-icon">t</div>
+          <div class="timer-track">
+            <div class="timer-fill" id="timerFill"></div>
+          </div>
+          <strong id="timerText">20s</strong>
+        </div>
+      </section>
+
+      <section class="screen complete-screen" data-screen="complete">
+        <div class="ambient-grid"></div>
+        <div class="brand-lockup compact">
+          <span class="brand-kicker">Congrats!</span>
+          <h1 id="completeTitle">You caught Banas</h1>
+        </div>
+
+        <div class="reward-card">
+          <div class="reward-viewport" id="rewardViewport"></div>
+          <div class="reward-name" id="rewardName">Banas</div>
+        </div>
+
+        <div class="complete-actions">
+          <button class="primary-action" id="playAgainButton" type="button">Catch Again</button>
+          <button class="secondary-action" id="shareButton" type="button">Copy Test Link</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./ar-app.js"></script>
+  </body>
+</html>
