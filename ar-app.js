@@ -165,7 +165,7 @@ async function syncCharacter(id, updateUrl = true) {
   previewName.textContent = selectedCharacter.name;
   gameTitle.textContent = `Find ${selectedCharacter.name}`;
   completeTitle.textContent = `You caught ${selectedCharacter.name}`;
-  rewardName.textContent = `${selectedCharacter.name} / ${selectedCharacter.place}`;
+  rewardName.textContent = selectedCharacter.name;
   if (updateUrl) {
     const url = new URL(window.location.href);
     url.searchParams.set("character", selectedId);
@@ -620,9 +620,9 @@ async function detectArSupport() {
   iosMotionSupported = isIOSDevice();
   arButton.disabled = !xrSupported && !iosMotionSupported;
   if (xrSupported) {
-    arButton.textContent = "Enter AR";
+    arButton.textContent = "Start Catch The Object";
   } else if (iosMotionSupported) {
-    arButton.textContent = window.isSecureContext ? "Start iOS AR" : "iOS Needs HTTPS";
+    arButton.textContent = window.isSecureContext ? "Start Catch The Object" : "iOS Needs HTTPS";
   } else {
     arButton.textContent = "AR Not Available";
   }

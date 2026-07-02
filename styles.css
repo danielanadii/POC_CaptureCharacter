@@ -33,6 +33,10 @@ select {
   font: inherit;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   display: grid;
   min-height: 100svh;
@@ -468,7 +472,7 @@ select {
 
 .reward-card {
   position: relative;
-  width: min(78vw, 320px);
+  width: min(82vw, 330px);
   border: 2px solid rgba(0, 208, 132, 0.72);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 35%),
@@ -489,7 +493,7 @@ select {
 .reward-viewport {
   display: block;
   width: 100%;
-  aspect-ratio: 1 / 1.24;
+  aspect-ratio: 1 / 1;
 }
 
 .reward-name {
