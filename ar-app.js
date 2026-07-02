@@ -61,6 +61,7 @@ let motionActive = false;
 let cameraActive = false;
 let iosSessionMessage = "";
 let dragStart = null;
+let studioRafId = 0;
 
 const gameScene = new THREE.Scene();
 const gameCamera = new THREE.PerspectiveCamera(68, 1, 0.01, 40);
@@ -94,6 +95,14 @@ function isIOSDevice() {
 function setScreen(screen) {
   [introScreen, gameScreen, completeScreen].forEach((node) => node.classList.remove("is-active"));
   screen.classList.add("is-active");
+  if (screen === gameScreen) {
+    stopStudios();
+  } else {
+    resizeGame();
+    renderStudio(preview);
+    renderStudio(reward);
+    startStudios();
+  }
 }
 
 async function loadModel(character) {
@@ -189,9 +198,26 @@ function renderStudio(studio) {
 }
 
 function animateStudios() {
+  if (!introScreen.classList.contains("is-active") && !completeScreen.classList.contains("is-active")) {
+    studioRafId = 0;
+    return;
+  }
   renderStudio(preview);
   renderStudio(reward);
-  requestAnimationFrame(animateStudios);
+  studioRafId = requestAnimationFrame(animateStudios);
+}
+
+function startStudios() {
+  if (!studioRafId) {
+    studioRafId = requestAnimationFrame(animateStudios);
+  }
+}
+
+function stopStudios() {
+  if (studioRafId) {
+    cancelAnimationFrame(studioRafId);
+    studioRafId = 0;
+  }
 }
 
 function resizeGame() {
@@ -208,6 +234,7 @@ function resizeGame() {
 async function startCameraFallback() {
   cameraFallback.style.display = "block";
   cameraFallback.style.opacity = "1";
+  cameraFeed.style.transform = "none";
   cameraActive = false;
   if (!navigator.mediaDevices?.getUserMedia) {
     return { ok: false, reason: "Camera API is unavailable in this browser." };
@@ -322,7 +349,7 @@ async function startIOSMotionSession() {
     iosSessionMessage = `${messages[0]} Drag still works as backup.`;
     statusText.textContent = iosSessionMessage;
   } else {
-    iosSessionMessage = "Turn your phone to find Mr Ghost.";
+    iosSessionMessage = "Turn your phone to find the object.";
     statusText.textContent = iosSessionMessage;
   }
   gameRenderer.setAnimationLoop(renderFrame);
@@ -387,6 +414,7 @@ function exitGame() {
   }
   stopCameraFallback();
   setScreen(introScreen);
+  renderStudio(preview);
 }
 
 function completeGame() {
@@ -403,6 +431,7 @@ function completeGame() {
   }
   stopCameraFallback();
   setScreen(completeScreen);
+  renderStudio(reward);
 }
 
 function renderFrame(now) {
@@ -472,16 +501,16 @@ function updateTimer(inside) {
   statusText.textContent = inside
     ? "Hold steady. Capture is charging!"
     : mode === "ar"
-      ? "Ghost is outside the box. Move your phone!"
+      ? "Object is outside the box. Move your phone!"
       : mode === "ios-motion"
         ? getIOSStatusText()
-        : "Ghost is outside the box. Drag to look around.";
+        : "Object is outside the box. Drag to look around.";
 }
 
 function getIOSStatusText() {
   if (iosSessionMessage && (!cameraActive || !motionPermissionGranted)) return iosSessionMessage;
   return motionActive
-    ? "Ghost is outside the box. Turn your phone!"
+    ? "Object is outside the box. Turn your phone!"
     : "Waiting for motion. Turn your phone or drag.";
 }
 
@@ -546,4 +575,4 @@ document.addEventListener("visibilitychange", () => {
 resizeGame();
 await syncCharacter(selectedId, false);
 await detectArSupport();
-animateStudios();
+startStudios();
