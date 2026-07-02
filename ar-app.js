@@ -8,6 +8,13 @@ const characters = {
     asset: "./assets/mr-ghost.glb",
     targetHeight: 1.05,
   },
+  saddie: {
+    name: "Saddie",
+    place: "AR Capture Zone",
+    asset: "./assets/saddie.glb",
+    targetHeight: 1.05,
+    facingOffset: -Math.PI / 2,
+  },
 };
 
 const captureSeconds = 20;
@@ -68,6 +75,7 @@ let dragStart = null;
 let studioRafId = 0;
 
 const fakeCameraHeight = 1.35;
+const previewSpawnHeight = fakeCameraHeight - 0.12;
 
 const gameScene = new THREE.Scene();
 const gameCamera = new THREE.PerspectiveCamera(68, 1, 0.01, 40);
@@ -81,6 +89,7 @@ gameRenderer.setClearColor(0x000000, 0);
 
 const characterRig = new THREE.Group();
 gameScene.add(characterRig);
+const cameraWorldPosition = new THREE.Vector3();
 gameScene.add(new THREE.HemisphereLight(0xffffff, 0x58427a, 2.3));
 const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
 keyLight.position.set(1.2, 2.2, 1.8);
@@ -124,6 +133,7 @@ async function loadModel(character) {
     }
   });
   normalizeModel(model, character.targetHeight);
+  model.rotation.y = character.facingOffset || 0;
   return model;
 }
 
@@ -466,19 +476,19 @@ function renderFrame(now) {
     chooseWorldTarget(now, false);
   }
 
-  characterRig.position.lerp(worldTarget, 1 - Math.pow(0.025, dt));
-  characterRig.rotation.y += dt * 0.9;
-  const activeModel = characterRig.children[0];
-  if (activeModel) {
-    const bobAmount = mode === "ar" ? 0.035 : 0.018;
-    activeModel.position.y = activeModel.userData.baseY + Math.sin(now * 0.004) * bobAmount;
-  }
-
   if (mode === "preview" || mode === "ios-motion") {
     updatePreviewCamera();
   }
 
   const activeCamera = mode === "ar" ? gameRenderer.xr.getCamera(gameCamera) : gameCamera;
+  characterRig.position.lerp(worldTarget, 1 - Math.pow(0.025, dt));
+  faceCamera(activeCamera);
+  const activeModel = characterRig.children[0];
+  if (activeModel) {
+    const bobAmount = mode === "ar" ? 0.055 : 0.045;
+    activeModel.position.y = activeModel.userData.baseY + Math.sin(now * 0.006) * bobAmount;
+  }
+
   const inside = isCharacterInsideReticle(activeCamera);
   if (gameStarted && inside) remaining = Math.max(0, remaining - dt);
   updateTimer(inside, !gameStarted);
@@ -490,13 +500,22 @@ function renderFrame(now) {
   }
 }
 
+function faceCamera(camera) {
+  camera.getWorldPosition(cameraWorldPosition);
+  const dx = cameraWorldPosition.x - characterRig.position.x;
+  const dz = cameraWorldPosition.z - characterRig.position.z;
+  characterRig.rotation.set(0, Math.atan2(dx, dz), 0);
+}
+
 function chooseWorldTarget(now, first) {
   const mostlyVisible = first || Math.random() > 0.46;
   const angle = mostlyVisible
     ? THREE.MathUtils.degToRad(THREE.MathUtils.randFloatSpread(48))
     : THREE.MathUtils.degToRad(THREE.MathUtils.randFloat(70, 170) * (Math.random() > 0.5 ? 1 : -1));
   const radius = THREE.MathUtils.randFloat(1.65, 2.25);
-  const height = mode === "ar" ? THREE.MathUtils.randFloat(-0.65, 0.85) : THREE.MathUtils.randFloat(-0.18, 0.9);
+  const height = mode === "ar"
+    ? THREE.MathUtils.randFloat(-0.65, 1.15)
+    : THREE.MathUtils.randFloat(fakeCameraHeight - 0.8, fakeCameraHeight + 0.85);
   worldTarget.set(Math.sin(angle) * radius, height, -Math.cos(angle) * radius);
   nextMoveAt = now + THREE.MathUtils.randFloat(1200, 2500);
 }
@@ -504,7 +523,7 @@ function chooseWorldTarget(now, first) {
 function getInitialWorldTarget() {
   return mode === "ar"
     ? new THREE.Vector3(0, 0, -2.1)
-    : new THREE.Vector3(0, 0.06, -1.9);
+    : new THREE.Vector3(0, previewSpawnHeight, -1.9);
 }
 
 function updatePreviewCamera() {
