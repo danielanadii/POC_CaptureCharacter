@@ -37,6 +37,8 @@ const statusPill = document.querySelector("#statusPill");
 const statusText = document.querySelector("#statusText");
 const timerFill = document.querySelector("#timerFill");
 const timerText = document.querySelector("#timerText");
+const startOverlay = document.querySelector("#startOverlay");
+const startNowButton = document.querySelector("#startNowButton");
 
 let selectedId = getCharacterId();
 let selectedCharacter = characters[selectedId] || characters["mr-ghost"];
@@ -48,6 +50,7 @@ let motionPermissionGranted = false;
 let mode = "preview";
 let running = false;
 let captured = false;
+let gameStarted = false;
 let remaining = captureSeconds;
 let lastFrame = 0;
 let nextMoveAt = 0;
@@ -56,12 +59,15 @@ let yaw = 0;
 let pitch = 0;
 let motionYaw = 0;
 let motionPitch = 0;
-let motionOrigin = null;
+let motionYawOrigin = null;
 let motionActive = false;
 let cameraActive = false;
+let cameraStatus = { ok: false, reason: "" };
 let iosSessionMessage = "";
 let dragStart = null;
 let studioRafId = 0;
+
+const fakeCameraHeight = 1.35;
 
 const gameScene = new THREE.Scene();
 const gameCamera = new THREE.PerspectiveCamera(68, 1, 0.01, 40);
@@ -281,20 +287,21 @@ async function startGame(nextMode) {
   mode = nextMode;
   remaining = captureSeconds;
   captured = false;
+  gameStarted = false;
   running = true;
   yaw = 0;
   pitch = 0;
   motionYaw = 0;
   motionPitch = 0;
-  motionOrigin = null;
+  motionYawOrigin = null;
   lastFrame = performance.now();
   nextMoveAt = 0;
-  worldTarget.set(0, 0, -2.1);
+  worldTarget.copy(getInitialWorldTarget());
   setScreen(gameScreen);
   resizeGame();
   await replaceGameModel();
-  updateTimer(false);
-  chooseWorldTarget(performance.now(), true);
+  showStartOverlay();
+  updateTimer(false, true);
 
   if (mode === "ar") {
     await startArSession();
@@ -306,10 +313,38 @@ async function startGame(nextMode) {
   }
 }
 
+async function beginCapture() {
+  if (!running || captured || gameStarted) return;
+  if (mode === "ios-motion" && !motionPermissionGranted) {
+    const motion = await requestIOSMotionPermission();
+    if (motion.ok) {
+      window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+    }
+    const messages = [];
+    if (!cameraStatus.ok) messages.push(cameraStatus.reason);
+    if (!motion.ok) messages.push(motion.reason);
+    iosSessionMessage = messages.length
+      ? `${messages[0]} Drag still works as backup.`
+      : "Turn your phone to find the object.";
+  }
+  gameStarted = true;
+  startOverlay.classList.add("is-hidden");
+  lastFrame = performance.now();
+  nextMoveAt = lastFrame + 650;
+  updateTimer(isCharacterInsideReticle(mode === "ar" ? gameRenderer.xr.getCamera(gameCamera) : gameCamera));
+}
+
+function showStartOverlay() {
+  startOverlay.classList.remove("is-hidden");
+  statusPill.classList.remove("is-escaped");
+  statusPill.classList.add("is-capturing");
+}
+
 async function replaceGameModel() {
   characterRig.clear();
   const model = await loadModel(selectedCharacter);
   model.position.y = -0.28;
+  model.userData.baseY = model.position.y;
   characterRig.add(model);
 }
 
@@ -337,21 +372,8 @@ async function startArSession() {
 async function startIOSMotionSession() {
   motionActive = false;
   iosSessionMessage = "";
-  const motion = await requestIOSMotionPermission();
-  const camera = await startCameraFallback();
-  if (motion.ok) {
-    window.addEventListener("deviceorientation", handleDeviceOrientation, true);
-  }
-  const messages = [];
-  if (!camera.ok) messages.push(camera.reason);
-  if (!motion.ok) messages.push(motion.reason);
-  if (messages.length) {
-    iosSessionMessage = `${messages[0]} Drag still works as backup.`;
-    statusText.textContent = iosSessionMessage;
-  } else {
-    iosSessionMessage = "Turn your phone to find the object.";
-    statusText.textContent = iosSessionMessage;
-  }
+  cameraStatus = await startCameraFallback();
+  statusText.textContent = "Press start when the object is in front of you.";
   gameRenderer.setAnimationLoop(renderFrame);
 }
 
@@ -385,15 +407,15 @@ function handleDeviceOrientation(event) {
   const heading = typeof event.webkitCompassHeading === "number"
     ? 360 - event.webkitCompassHeading
     : event.alpha || 0;
-  const current = {
-    alpha: THREE.MathUtils.degToRad(heading),
-    beta: THREE.MathUtils.degToRad(event.beta || 0),
-  };
-  if (!motionOrigin) {
-    motionOrigin = current;
+  if (motionYawOrigin == null) {
+    motionYawOrigin = heading;
   }
-  motionYaw = THREE.MathUtils.euclideanModulo(current.alpha - motionOrigin.alpha + Math.PI, Math.PI * 2) - Math.PI;
-  motionPitch = THREE.MathUtils.clamp((current.beta - motionOrigin.beta) * 0.72, -0.62, 0.62);
+  motionYaw = THREE.MathUtils.degToRad(THREE.MathUtils.euclideanModulo(heading - motionYawOrigin + 180, 360) - 180);
+
+  // iOS reports beta around 90deg when the phone is upright. Preserve absolute
+  // pitch so looking down at the floor shows the model from above.
+  const beta = event.beta ?? 90;
+  motionPitch = THREE.MathUtils.clamp(THREE.MathUtils.degToRad(beta - 90), -1.25, 0.55);
 }
 
 function handleXrEnd() {
@@ -403,6 +425,7 @@ function handleXrEnd() {
 
 function exitGame() {
   running = false;
+  gameStarted = false;
   gameRenderer.setAnimationLoop(null);
   window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
   motionActive = false;
@@ -420,6 +443,7 @@ function exitGame() {
 function completeGame() {
   running = false;
   captured = true;
+  gameStarted = false;
   gameRenderer.setAnimationLoop(null);
   window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
   motionActive = false;
@@ -438,13 +462,17 @@ function renderFrame(now) {
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
 
-  if (now > nextMoveAt) {
+  if (gameStarted && now > nextMoveAt) {
     chooseWorldTarget(now, false);
   }
 
   characterRig.position.lerp(worldTarget, 1 - Math.pow(0.025, dt));
   characterRig.rotation.y += dt * 0.9;
-  characterRig.position.y += Math.sin(now * 0.004) * 0.0018;
+  const activeModel = characterRig.children[0];
+  if (activeModel) {
+    const bobAmount = mode === "ar" ? 0.035 : 0.018;
+    activeModel.position.y = activeModel.userData.baseY + Math.sin(now * 0.004) * bobAmount;
+  }
 
   if (mode === "preview" || mode === "ios-motion") {
     updatePreviewCamera();
@@ -452,8 +480,8 @@ function renderFrame(now) {
 
   const activeCamera = mode === "ar" ? gameRenderer.xr.getCamera(gameCamera) : gameCamera;
   const inside = isCharacterInsideReticle(activeCamera);
-  if (inside) remaining = Math.max(0, remaining - dt);
-  updateTimer(inside);
+  if (gameStarted && inside) remaining = Math.max(0, remaining - dt);
+  updateTimer(inside, !gameStarted);
 
   gameRenderer.render(gameScene, gameCamera);
 
@@ -468,17 +496,28 @@ function chooseWorldTarget(now, first) {
     ? THREE.MathUtils.degToRad(THREE.MathUtils.randFloatSpread(48))
     : THREE.MathUtils.degToRad(THREE.MathUtils.randFloat(70, 170) * (Math.random() > 0.5 ? 1 : -1));
   const radius = THREE.MathUtils.randFloat(1.65, 2.25);
-  worldTarget.set(Math.sin(angle) * radius, THREE.MathUtils.randFloat(-0.42, 0.56), -Math.cos(angle) * radius);
+  const height = mode === "ar" ? THREE.MathUtils.randFloat(-0.65, 0.85) : THREE.MathUtils.randFloat(-0.18, 0.9);
+  worldTarget.set(Math.sin(angle) * radius, height, -Math.cos(angle) * radius);
   nextMoveAt = now + THREE.MathUtils.randFloat(1200, 2500);
 }
 
+function getInitialWorldTarget() {
+  return mode === "ar"
+    ? new THREE.Vector3(0, 0, -2.1)
+    : new THREE.Vector3(0, 0.06, -1.9);
+}
+
 function updatePreviewCamera() {
-  const activeYaw = mode === "ios-motion" ? motionYaw + yaw : yaw;
-  const activePitch = mode === "ios-motion" ? motionPitch + pitch : pitch;
-  const x = Math.sin(activeYaw) * 0.12;
-  const z = Math.cos(activeYaw) * 0.12;
-  gameCamera.position.set(x, Math.sin(activePitch) * 0.08, z);
-  gameCamera.rotation.set(activePitch, activeYaw, 0, "YXZ");
+  if (mode === "ios-motion") {
+    gameCamera.position.set(0, fakeCameraHeight, 0);
+    gameCamera.rotation.set(motionPitch + pitch, motionYaw + yaw, 0, "YXZ");
+    return;
+  }
+
+  const x = Math.sin(yaw) * 0.12;
+  const z = Math.cos(yaw) * 0.12;
+  gameCamera.position.set(x, fakeCameraHeight + Math.sin(pitch) * 0.08, z);
+  gameCamera.rotation.set(pitch, yaw, 0, "YXZ");
 }
 
 function isCharacterInsideReticle(camera) {
@@ -492,13 +531,15 @@ function isCharacterInsideReticle(camera) {
   return px > rect.left + margin && px < rect.right - margin && py > rect.top + margin && py < rect.bottom - margin;
 }
 
-function updateTimer(inside) {
+function updateTimer(inside, waitingToStart = false) {
   const progress = (captureSeconds - remaining) / captureSeconds;
   timerFill.style.width = `${Math.round(progress * 100)}%`;
   timerText.textContent = `${Math.ceil(remaining)}s`;
-  statusPill.classList.toggle("is-capturing", inside);
-  statusPill.classList.toggle("is-escaped", !inside);
-  statusText.textContent = inside
+  statusPill.classList.toggle("is-capturing", inside || waitingToStart);
+  statusPill.classList.toggle("is-escaped", !inside && !waitingToStart);
+  statusText.textContent = waitingToStart
+    ? "Press start when the object is in front of you."
+    : inside
     ? "Hold steady. Capture is charging!"
     : mode === "ar"
       ? "Object is outside the box. Move your phone!"
@@ -557,6 +598,7 @@ function onDragEnd() {
 characterSelect.addEventListener("change", (event) => syncCharacter(event.target.value));
 arButton.addEventListener("click", () => startGame(xrSupported ? "ar" : "ios-motion"));
 startButton.addEventListener("click", () => startGame("preview"));
+startNowButton.addEventListener("click", () => beginCapture());
 exitButton.addEventListener("click", exitGame);
 playAgainButton.addEventListener("click", () => startGame(xrSupported ? "ar" : iosMotionSupported ? "ios-motion" : "preview"));
 shareButton.addEventListener("click", copyLink);

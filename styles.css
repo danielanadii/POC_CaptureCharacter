@@ -326,6 +326,59 @@ select {
   border-radius: 0 0 18px 0;
 }
 
+.start-overlay {
+  position: absolute;
+  z-index: 5;
+  top: calc(27% + min(72vw, 300px) * 0.27);
+  left: 50%;
+  display: grid;
+  width: min(76vw, 320px);
+  transform: translateX(-50%);
+  gap: 13px;
+  justify-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.start-overlay.is-hidden {
+  display: none;
+}
+
+.start-copy {
+  display: grid;
+  gap: 2px;
+  color: var(--ink);
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.78);
+}
+
+.start-copy strong {
+  color: var(--primary);
+  font-size: 1.12rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.start-copy span {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.start-now-button {
+  pointer-events: auto;
+  width: min(68vw, 292px);
+  min-height: 54px;
+  border: 0;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #00a86b, #00d084);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.36),
+    0 0 24px rgba(0, 208, 132, 0.42);
+  color: white;
+  font-size: 1rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
 .status-pill {
   position: absolute;
   z-index: 4;
