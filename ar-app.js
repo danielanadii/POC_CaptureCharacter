@@ -66,8 +66,11 @@ let yaw = 0;
 let pitch = 0;
 let motionYaw = 0;
 let motionPitch = 0;
+let targetMotionYaw = 0;
+let targetMotionPitch = 0;
 let motionYawOrigin = null;
 let motionActive = false;
+let motionListenerActive = false;
 let cameraActive = false;
 let cameraStatus = { ok: false, reason: "" };
 let iosSessionMessage = "";
@@ -76,6 +79,7 @@ let studioRafId = 0;
 
 const fakeCameraHeight = 1.35;
 const previewSpawnHeight = fakeCameraHeight - 0.12;
+const motionSmoothRate = 10;
 
 const gameScene = new THREE.Scene();
 const gameCamera = new THREE.PerspectiveCamera(68, 1, 0.01, 40);
@@ -303,6 +307,8 @@ async function startGame(nextMode) {
   pitch = 0;
   motionYaw = 0;
   motionPitch = 0;
+  targetMotionYaw = 0;
+  targetMotionPitch = 0;
   motionYawOrigin = null;
   lastFrame = performance.now();
   nextMoveAt = 0;
@@ -325,10 +331,10 @@ async function startGame(nextMode) {
 
 async function beginCapture() {
   if (!running || captured || gameStarted) return;
-  if (mode === "ios-motion" && !motionPermissionGranted) {
+  if (mode === "ios-motion") {
     const motion = await requestIOSMotionPermission();
     if (motion.ok) {
-      window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+      startMotionListener();
     }
     const messages = [];
     if (!cameraStatus.ok) messages.push(cameraStatus.reason);
@@ -342,6 +348,18 @@ async function beginCapture() {
   lastFrame = performance.now();
   nextMoveAt = lastFrame + 650;
   updateTimer(isCharacterInsideReticle(mode === "ar" ? gameRenderer.xr.getCamera(gameCamera) : gameCamera));
+}
+
+function startMotionListener() {
+  if (motionListenerActive) return;
+  window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+  motionListenerActive = true;
+}
+
+function stopMotionListener() {
+  if (!motionListenerActive) return;
+  window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
+  motionListenerActive = false;
 }
 
 function showStartOverlay() {
@@ -420,12 +438,12 @@ function handleDeviceOrientation(event) {
   if (motionYawOrigin == null) {
     motionYawOrigin = heading;
   }
-  motionYaw = THREE.MathUtils.degToRad(THREE.MathUtils.euclideanModulo(heading - motionYawOrigin + 180, 360) - 180);
+  targetMotionYaw = THREE.MathUtils.degToRad(THREE.MathUtils.euclideanModulo(heading - motionYawOrigin + 180, 360) - 180);
 
   // iOS reports beta around 90deg when the phone is upright. Preserve absolute
   // pitch so looking down at the floor shows the model from above.
   const beta = event.beta ?? 90;
-  motionPitch = THREE.MathUtils.clamp(THREE.MathUtils.degToRad(beta - 90), -1.25, 0.55);
+  targetMotionPitch = THREE.MathUtils.clamp(THREE.MathUtils.degToRad(beta - 90), -1.25, 0.55);
 }
 
 function handleXrEnd() {
@@ -437,7 +455,7 @@ function exitGame() {
   running = false;
   gameStarted = false;
   gameRenderer.setAnimationLoop(null);
-  window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
+  stopMotionListener();
   motionActive = false;
   iosSessionMessage = "";
   if (xrSession) {
@@ -455,7 +473,7 @@ function completeGame() {
   captured = true;
   gameStarted = false;
   gameRenderer.setAnimationLoop(null);
-  window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
+  stopMotionListener();
   motionActive = false;
   iosSessionMessage = "";
   if (xrSession) {
@@ -475,6 +493,8 @@ function renderFrame(now) {
   if (gameStarted && now > nextMoveAt) {
     chooseWorldTarget(now, false);
   }
+
+  smoothMotion(dt);
 
   if (mode === "preview" || mode === "ios-motion") {
     updatePreviewCamera();
@@ -498,6 +518,17 @@ function renderFrame(now) {
   if (remaining <= 0 && !captured) {
     completeGame();
   }
+}
+
+function smoothMotion(dt) {
+  if (mode !== "ios-motion") return;
+  const amount = 1 - Math.exp(-motionSmoothRate * dt);
+  motionYaw += shortestAngleDelta(motionYaw, targetMotionYaw) * amount;
+  motionPitch = THREE.MathUtils.lerp(motionPitch, targetMotionPitch, amount);
+}
+
+function shortestAngleDelta(from, to) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
 function faceCamera(camera) {
