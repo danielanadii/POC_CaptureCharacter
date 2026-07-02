@@ -17,7 +17,7 @@ const characters = {
   },
 };
 
-const captureSeconds = 20;
+const captureSeconds = 5;
 const loader = new GLTFLoader();
 const modelCache = new Map();
 
