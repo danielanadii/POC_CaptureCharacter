@@ -56,7 +56,11 @@
             <span class="eyebrow">Follow the object</span>
             <strong id="gameTitle">Keep Banas inside</strong>
           </div>
-          <button class="icon-button" id="exitButton" type="button" aria-label="Exit game">x</button>
+          <button class="icon-button" id="exitButton" type="button" aria-label="Exit game">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18"></path>
+            </svg>
+          </button>
         </div>
 
         <div class="capture-reticle" id="captureReticle" aria-hidden="true">
@@ -80,7 +84,12 @@
         </div>
 
         <div class="timer-card">
-          <div class="timer-icon">t</div>
+          <div class="timer-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <circle cx="12" cy="12" r="8"></circle>
+              <path d="M12 7v5l3 2"></path>
+            </svg>
+          </div>
           <div class="timer-track">
             <div class="timer-fill" id="timerFill"></div>
           </div>

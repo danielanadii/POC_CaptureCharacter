@@ -279,6 +279,8 @@ select {
 }
 
 .icon-button {
+  display: grid;
+  place-items: center;
   pointer-events: auto;
   width: 40px;
   height: 40px;
@@ -287,6 +289,15 @@ select {
   background: rgba(4, 26, 20, 0.76);
   color: var(--ink);
   font-weight: 900;
+}
+
+.icon-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
 }
 
 .capture-reticle {
@@ -454,6 +465,16 @@ select {
   background: rgba(255, 255, 255, 0.92);
   color: var(--primary-strong);
   font-weight: 950;
+}
+
+.timer-icon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .timer-track {
