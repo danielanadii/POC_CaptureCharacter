@@ -248,7 +248,14 @@ function stopStudios() {
 }
 
 function resizeGame() {
-  const rect = gameCanvas.getBoundingClientRect();
+  const activeCanvas = mode === "8thwall" ? xrCanvas : gameCanvas;
+  let rect = activeCanvas.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) {
+    rect = gameScreen.getBoundingClientRect();
+  }
+  if (rect.width < 2 || rect.height < 2) {
+    rect = document.querySelector(".phone-shell").getBoundingClientRect();
+  }
   const width = Math.max(1, Math.floor(rect.width));
   const height = Math.max(1, Math.floor(rect.height));
   gameRenderer.setSize(width, height, false);
