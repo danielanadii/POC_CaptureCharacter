@@ -457,6 +457,9 @@ function makeEighthWallGameModule(XR8) {
       eighthWallCamera = camera;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.setClearColor(0x000000, 0);
+      renderer.autoClear = false;
+      renderer.autoClearColor = false;
+      renderer.autoClearStencil = false;
       scene.add(characterRig);
       scene.add(new THREE.HemisphereLight(0xffffff, 0x58427a, 2.3));
       const light = new THREE.DirectionalLight(0xffffff, 2.4);
